@@ -43,7 +43,7 @@ exports.getUserWithId = getUserWithId;
  * @return {Promise<{}>} A promise to the user.
  */
 const addUser = function (user) {
-  db.query(`INSERT INTO users ('name','password','email') VALUES ($1,$2,$3);`, [user.name,user.password,user.email])
+  db.query(`INSERT INTO users ('name','password','email') VALUES ($1,$2,$3);`, [user.name, user.password, user.email])
     .then((res) => {
       return res.rows[0];
     });
@@ -64,9 +64,9 @@ const getAllReservations = function (guest_id, limit = 10) {
   WHERE guest_id = $1
   WHERE start_date <> DATE(NOW());
   LIMIT $2`, [guest_id, limit])
-  .then((res) => {
-    return res.rows[0];
-  });
+    .then((res) => {
+      return res.rows[0];
+    });
 }
 exports.getAllReservations = getAllReservations;
 
@@ -88,21 +88,39 @@ const getAllProperties = function (options, limit = 10) {
     SELECT properties.*, avg(property_reviews.rating) as average_rating
     FROM properties
     JOIN property_reviews ON properties.id = property_id
-    `;
-  
+    WHERE 1 = 1`;
+
     // 3
     if (options.city) {
       queryParams.push(`%${options.city}%`);
-      queryString += `WHERE city LIKE $${queryParams.length} `;
+      queryString += `AND city LIKE $${queryParams.length} `;
     }
+
+    if (options.owner_id) {
+      queryParams.push(options.owner_id);
+      queryString += `AND owner_id = $${queryParams.length} `;
+    }
+
+    if (minimum_price_per_night && maximum_price_per_night) {
+      queryParams.push( options.minimum_price_per_night, options.maximum_price_per_night );
+      queryString += `AND cost_per_night <= $${queryParams.length}
+                      AND cost_per_night >= $${queryParams.length - 1} `;
+    }
+
+    queryString += `GROUP BY properties.id`
+
+    if (options.minimum_rating) {
+      queryParams.push( options.minimum_rating );
+      queryString += `HAVING average_rating >= $${queryParams.length}`;
+    }
+    
   
     // 4
     queryParams.push(limit);
     queryString += `
-    GROUP BY properties.id
     ORDER BY cost_per_night
-    LIMIT $${queryParams.length};
-    `;
+    LIMIT $${ queryParams.length };
+      `;
   
     // 5
     console.log(queryString, queryParams);
@@ -122,21 +140,21 @@ exports.getAllProperties = getAllProperties;
 const addProperty = function (property) {
 
   db.query(`INSERT INTO properties
-  (owner_id ,
-    title,
-    description ,
-    thumbnail_photo_url ,
-    cover_photo_url ,
-    cost_per_night ,
-    street ,
-    city ,
-    province ,
-    post_code ,
-    country ,
-    parking_spaces ,
-    number_of_bathrooms ,
-    number_of_bedrooms 
-  ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        (owner_id,
+          title,
+          description,
+          thumbnail_photo_url,
+          cover_photo_url,
+          cost_per_night,
+          street,
+          city,
+          province,
+          post_code,
+          country,
+          parking_spaces,
+          number_of_bathrooms,
+          number_of_bedrooms
+        ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
   [property.owner_id ,
     property.title,
     property.description ,
